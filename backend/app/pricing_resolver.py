@@ -49,7 +49,13 @@ def _normalize_to_gb_month(price_per_unit: float, unit: str) -> float | None:
 
 def _parse_price_dimension(dim: dict[str, Any], currency: str) -> tuple[float | None, str]:
     """Extract price and unit from price dimension. Returns (price_per_gb_month, unit)."""
-    price_per_unit = dim.get("pricePerUnit", {}).get(currency)
+    pu = dim.get("pricePerUnit")
+    if isinstance(pu, dict):
+        price_per_unit = pu.get(currency)
+    elif pu is not None:
+        price_per_unit = pu  # string or number
+    else:
+        price_per_unit = None
     if price_per_unit is None:
         return None, dim.get("unit", "")
     try:
@@ -62,6 +68,19 @@ def _parse_price_dimension(dim: dict[str, Any], currency: str) -> tuple[float | 
 
 def _build_tier_band(from_gb: float, to_gb: float, rate: float) -> dict[str, float]:
     return {"from_gb": from_gb, "to_gb": to_gb, "rate_per_gb_month": rate}
+
+
+# S3 product attribute storageClass: API/public list often uses "General Purpose" for Standard.
+S3_STORAGE_CLASS_API_MAP: dict[str, str] = {
+    "standard": "General Purpose",
+    "general purpose": "General Purpose",
+}
+
+
+def _s3_storage_class_for_api(storage_class: str) -> str:
+    """Return storage class value for GetProducts filter (e.g. Standard -> General Purpose)."""
+    key = (storage_class or "").strip().lower()
+    return S3_STORAGE_CLASS_API_MAP.get(key, storage_class.strip() or storage_class)
 
 
 def get_products(client: Any, service: str, filters: list[dict]) -> list[dict]:
@@ -96,7 +115,8 @@ def resolve_aws_backup_storage(
 
     # 1) Try public price list (no credentials required)
     pub_result = pub.resolve_aws_backup_storage_public(region_code, currency)
-    if not pub_result.error and pub_result.rate_per_gb_month is not None:
+    if pub_result.rate_per_gb_month is not None:
+        # Return public result (exact region or fallback region + warning) so UI shows rate and any message
         return PricingResult(
             rate_per_gb_month=pub_result.rate_per_gb_month,
             currency=pub_result.currency,
@@ -106,6 +126,7 @@ def resolve_aws_backup_storage(
             term_code=pub_result.term_code,
             price_dimension=pub_result.price_dimension,
             raw_filter_used=pub_result.raw_filter_used,
+            error=pub_result.error,
         )
 
     # 2) Fallback to Pricing API (requires credentials)
@@ -223,11 +244,12 @@ def resolve_s3_storage(
         )
 
     # 2) Fallback to Pricing API (requires credentials)
+    api_storage_class = _s3_storage_class_for_api(storage_class)
     filters = [
         {"Type": "TERM_MATCH", "Field": "productFamily", "Value": "Storage"},
         {"Type": "TERM_MATCH", "Field": "location", "Value": location},
         {"Type": "TERM_MATCH", "Field": "serviceCode", "Value": "Amazon S3"},
-        {"Type": "TERM_MATCH", "Field": "storageClass", "Value": storage_class},
+        {"Type": "TERM_MATCH", "Field": "storageClass", "Value": api_storage_class},
     ]
     try:
         c = client or boto3.client("pricing", region_name=PRICING_REGION)

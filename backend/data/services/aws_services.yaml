@@ -1,0 +1,51 @@
+# AWS core services for multi-cloud calculator MVP (~20 entries).
+# Schema: id, name, category, scenarios (optional), description (optional).
+# id is unique per cloud (e.g. aws-ecs-fargate).
+
+- id: aws-ecs-fargate
+  name: ECS Fargate
+  category: compute
+  scenarios: [web_app, api_backend, microservices]
+  description: Serverless containers, auto-scaling.
+
+- id: aws-ec2
+  name: EC2
+  category: compute
+  scenarios: [web_app, api_backend, data_pipeline, database_app]
+  description: Virtual servers, full control.
+
+- id: aws-lambda
+  name: Lambda
+  category: compute
+  scenarios: [api_backend, data_pipeline, event_driven]
+  description: Serverless functions, event-driven.
+
+- id: aws-rds-postgres
+  name: RDS PostgreSQL
+  category: database
+  scenarios: [web_app, api_backend, database_app]
+  description: Managed relational database.
+
+- id: aws-s3
+  name: Amazon S3
+  category: storage
+  scenarios: [web_app, static_site, data_pipeline, backup]
+  description: Object storage, static assets, backups.
+
+- id: aws-cloudfront
+  name: CloudFront
+  category: cdn
+  scenarios: [web_app, static_site]
+  description: CDN, low-latency delivery.
+
+- id: aws-alb
+  name: Application Load Balancer
+  category: networking
+  scenarios: [web_app, api_backend]
+  description: Layer 7 load balancing.
+
+- id: aws-elasticache-redis
+  name: ElastiCache Redis
+  category: cache
+  scenarios: [web_app, api_backend]
+  description: In-memory cache, sessions.

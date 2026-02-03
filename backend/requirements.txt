@@ -1,9 +1,12 @@
 # awspricing backend - v1.0
-# Live AWS Pricing API + cost engine. Deps: boto3, FastAPI, uvicorn.
+# Live AWS Pricing API + cost engine + conversation (Claude). Deps: boto3, FastAPI, uvicorn, anthropic.
 # Port: 8000
 fastapi==0.109.2
 uvicorn[standard]==0.27.1
 boto3==1.34.34
 pydantic==2.6.1
 pydantic-settings==2.1.0
+anthropic==0.39.0
+httpx>=0.23.0,<0.28.0
+PyYAML>=6.0
 pytest==8.0.0

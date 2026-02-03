@@ -47,3 +47,5 @@ So **awspricing already uses the same pricing source as the AWS Pricing Calculat
 - **Same rates as the calculator** — Yes. This app’s rates come from the AWS Price List, which is the same source the AWS Pricing Calculator uses.
 
 For more detail on how we resolve prices (public URLs, GetProducts fallback, region mapping), see the root [README](../README.md) and [docs/README.md](README.md).
+
+**See also:** [AWS S3 & AWS Backup — what they are and how pricing works](AWS-S3-AND-BACKUP-PRICING.md) (what S3 and AWS Backup are, how they are priced, and why “Backup not in public price list for this region” can appear).

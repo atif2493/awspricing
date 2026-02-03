@@ -37,6 +37,8 @@ The **AWS Pricing Calculator** (calculator.aws) is a web app with **no public AP
 - **Region mapping:** Region codes (e.g. `us-east-1`) are mapped to location strings (e.g. `US East (N. Virginia)`) in `backend/app/region_mapping.py`.
 - **Caching:** Pricing responses are cached in memory (24h TTL). Use **Refresh prices** in the UI to bypass cache.
 
+**Further reading:** [AWS S3 & AWS Backup — what they are and how pricing works](docs/AWS-S3-AND-BACKUP-PRICING.md) | [Pricing sources (calculator, API)](docs/PRICING-SOURCES.md) | [Detailed docs](docs/README.md)
+
 ---
 
 ## Credential setup

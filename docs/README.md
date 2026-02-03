@@ -18,6 +18,8 @@
 8. [Testing](#8-testing)
 9. [Limitations & troubleshooting](#9-limitations--troubleshooting)
 
+**Related:** [AWS S3 & AWS Backup — what they are and how pricing works](AWS-S3-AND-BACKUP-PRICING.md) | [Pricing sources (calculator, API)](PRICING-SOURCES.md)
+
 ---
 
 ## 1. Overview
@@ -108,6 +110,8 @@ All pricing is resolved server-side via the AWS Pricing API; the UI never uses h
 - **Role:** Maps region codes (e.g. `us-east-1`) to Pricing API location strings (e.g. `US East (N. Virginia)`).
 - **Coverage:** All standard AWS regions; new regions require an entry in `REGION_TO_LOCATION`.
 - **Tests:** `tests/test_region_mapping.py` (roundtrip, unknown region).
+
+**See also:** [AWS S3 & AWS Backup — what they are and how pricing works](AWS-S3-AND-BACKUP-PRICING.md) (what S3 and AWS Backup are, how they are priced, and how the app gets those prices).
 
 ### 3.5 Caching
 

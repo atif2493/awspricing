@@ -153,13 +153,15 @@ def _range_from_dim(dim: dict[str, Any]) -> tuple[float, float]:
     return start, end
 
 
-def _backup_storage_match(attrs: dict[str, Any], location: str) -> bool:
-    """True if product looks like Backup storage for the given location."""
+def _backup_storage_match(
+    attrs: dict[str, Any], location: str, product_family: str | None = None
+) -> bool:
+    """True if product looks like Backup storage for the given location.
+    product_family: from product-level attribute (AWS JSON has it at product level)."""
     loc = (attrs.get("location") or "").strip()
     if loc != location:
         return False
-    pf = (attrs.get("productFamily") or "").strip().lower()
-    # Accept Storage, Backup Storage, or any product with backup-related usage
+    pf = (product_family or attrs.get("productFamily") or "").strip().lower()
     if pf in ("storage", "backup storage", "backup"):
         return True
     ut = (attrs.get("usagetype") or attrs.get("usageType") or "").lower()
@@ -170,13 +172,50 @@ def _backup_storage_match(attrs: dict[str, Any], location: str) -> bool:
     return False
 
 
+def _find_backup_rate_for_location(
+    products: dict[str, Any],
+    on_demand: dict[str, Any],
+    location: str,
+    currency: str,
+) -> tuple[float, str, dict[str, Any], dict[str, Any]] | None:
+    """Find first Backup storage rate for the given location. Returns (rate, sku, attrs, dim) or None.
+    Prefers GB-Mo / GB-month (storage) over plain GB (transfer)."""
+    product_family = None
+    for sku, product in products.items():
+        attrs = product.get("attributes") or {}
+        product_family = product.get("productFamily")  # AWS JSON has it at product level
+        if not _backup_storage_match(attrs, location, product_family):
+            continue
+        if sku not in on_demand:
+            continue
+        term_entries = on_demand[sku]
+        for _term_sku, term_detail in term_entries.items():
+            dims = term_detail.get("priceDimensions") or {}
+            for _dim_id, dim in dims.items():
+                price_per_unit, unit = _parse_price_dimension(dim, currency)
+                if price_per_unit is None:
+                    continue
+                u = (unit or "").strip().lower()
+                if "gb-mo" not in u and "gb-month" not in u:
+                    continue
+                rate = _normalize_to_gb_month(price_per_unit, unit)
+                if rate is not None and rate >= 0:
+                    return (rate, sku, dict(attrs), dict(dim))
+    return None
+
+
+# Fallback region when Backup isn't in the public list for the selected region (show rate + warning).
+BACKUP_FALLBACK_REGION = "us-east-1"
+
+
 def resolve_aws_backup_storage_public(
     region_code: str,
     currency: str = "USD",
 ) -> PricingResult:
     """
     Resolve AWS Backup storage pricing from public price list (no credentials).
-    Tries discovered Backup offer code from index, then AWSBackup. Relaxed product filter.
+    Tries discovered Backup offer code from index, then AWSBackup. If the selected region
+    has no Backup listing, falls back to us-east-1 rate and returns a warning so the comparison still works.
     """
     location = get_location_for_region(region_code)
     if not location:
@@ -222,33 +261,62 @@ def resolve_aws_backup_storage_public(
     best = PricingResult(
         raw_filter_used={"service": "AWS Backup (public)", "location": location, "url": url},
     )
-    for sku, product in products.items():
-        attrs = product.get("attributes") or {}
-        if not _backup_storage_match(attrs, location):
-            continue
-        if sku not in on_demand:
-            continue
-        term_entries = on_demand[sku]
-        for term_sku, term_detail in term_entries.items():
-            dims = term_detail.get("priceDimensions") or {}
-            for dim_id, dim in dims.items():
-                price_per_unit, unit = _parse_price_dimension(dim, currency)
-                if price_per_unit is None:
-                    continue
-                rate = _normalize_to_gb_month(price_per_unit, unit)
-                if rate is not None and rate >= 0:
-                    best.rate_per_gb_month = rate
-                    best.sku = sku
-                    best.product_attributes = dict(attrs)
-                    best.term_code = "OnDemand"
-                    best.price_dimension = dict(dim)
-                    best.currency = currency
-                    best.unit = "GB-Mo"
-                    return best
+    found = _find_backup_rate_for_location(products, on_demand, location, currency)
+    if found:
+        rate, sku, attrs, dim = found
+        best.rate_per_gb_month = rate
+        best.sku = sku
+        best.product_attributes = attrs
+        best.term_code = "OnDemand"
+        best.price_dimension = dim
+        best.currency = currency
+        best.unit = "GB-Mo"
+        return best
 
-    # Not found: return a message that doesn't mention credentials; S3 can still work
+    # Not found for this region: try fallback region so user still gets a comparison
+    fallback_location = get_location_for_region(BACKUP_FALLBACK_REGION)
+    if fallback_location and fallback_location != location:
+        fallback_found = _find_backup_rate_for_location(
+            products, on_demand, fallback_location, currency
+        )
+        if fallback_found:
+            rate, sku, attrs, dim = fallback_found
+            best.rate_per_gb_month = rate
+            best.sku = sku
+            best.product_attributes = attrs
+            best.term_code = "OnDemand"
+            best.price_dimension = dim
+            best.currency = currency
+            best.unit = "GB-Mo"
+            best.error = (
+                f"AWS Backup storage not in public price list for this region. "
+                f"Rate shown is for {BACKUP_FALLBACK_REGION} ({fallback_location}). "
+                "S3 comparison below uses public pricing for your selected region. Use \"Refresh prices\" to retry."
+            )
+            return best
+
+    # No rate at all
     best.error = "AWS Backup storage not in public price list for this region. S3 comparison below uses public pricing."
     return best
+
+
+def _s3_usagetype_matches(storage_class: str, usagetype: str) -> bool:
+    """True if usagetype (from regional index) matches the requested storage class."""
+    want = (storage_class or "").strip().lower()
+    ut = (usagetype or "").strip()
+    if want == "standard" or want == "general purpose":
+        return ut == "TimedStorage-ByteHrs"
+    if want == "standard-ia":
+        return "TimedStorage-SIA" in ut
+    if want == "intelligent-tiering":
+        return "TimedStorage-INT" in ut
+    if want == "glacier instant retrieval":
+        return "TimedStorage-GIR" in ut
+    if want == "glacier flexible retrieval":
+        return "TimedStorage-Glacier" in ut or "GlacierByteHrs" in ut
+    if want == "glacier deep archive":
+        return "INT-AA" in ut or "INT-DAA" in ut
+    return ut == f"TimedStorage-{storage_class}" or storage_class.lower() in ut.lower()
 
 
 def resolve_s3_storage_public(
@@ -258,25 +326,25 @@ def resolve_s3_storage_public(
 ) -> PricingResult:
     """
     Resolve S3 storage pricing from public price list (no credentials).
-    Tries global URL first (all regions in one file), then regional. Filters Storage, location, storageClass.
+    Tries regional URL first (has products with location/usagetype), then global. Matches by productFamily+storageClass or by usagetype.
     """
     location = get_location_for_region(region_code)
     if not location:
         return PricingResult(error=f"Unknown region: {region_code}")
 
     fetch_error = ""
-    url = _resolve_offer_url(SERVICE_CODE_S3)
-    if url:
-        data, fetch_error = _fetch_json(url)
-    else:
-        data, fetch_error = None, ""
+    data = None
+    url = None
+    url = _get_offer_url_regional(SERVICE_CODE_S3, region_code)
+    data, fetch_error = _fetch_json(url)
+    if not data:
+        url = _resolve_offer_url(SERVICE_CODE_S3)
+        if url:
+            data, fetch_error = _fetch_json(url)
+        else:
+            fetch_error = ""
     if not data:
         url = _get_offer_url_global(SERVICE_CODE_S3)
-        data, fetch_error2 = _fetch_json(url)
-        if fetch_error2:
-            fetch_error = fetch_error2
-    if not data:
-        url = _get_offer_url_regional(SERVICE_CODE_S3, region_code)
         data, fetch_error2 = _fetch_json(url)
         if fetch_error2:
             fetch_error = fetch_error2
@@ -299,21 +367,25 @@ def resolve_s3_storage_public(
         },
     )
     tiers_with_rates: list[tuple[float, float, float]] = []
+    want = storage_class.strip().lower()
 
     for sku, product in products.items():
         attrs = product.get("attributes") or {}
-        if attrs.get("productFamily") != "Storage":
-            continue
         if attrs.get("location") != location:
             continue
-        # storageClass in public list: "General Purpose" for Standard, "Standard-IA", etc.
-        sc = (attrs.get("storageClass") or attrs.get("storage class") or "").strip().lower()
-        want = storage_class.strip().lower()
-        if sc:
-            if want == "standard" and ("general" in sc or sc == "standard"):
-                pass
-            elif want != sc and want not in sc and sc not in want:
-                continue
+        product_family = attrs.get("productFamily") or product.get("productFamily")
+        storage_class_ok = False
+        if product_family == "Storage":
+            sc = (attrs.get("storageClass") or attrs.get("storage class") or "").strip().lower()
+            if want == "standard" and ("general" in sc or sc == "standard" or not sc):
+                storage_class_ok = True
+            elif sc and (want == sc or want in sc or sc in want):
+                storage_class_ok = True
+        else:
+            ut = attrs.get("usagetype") or attrs.get("usageType") or ""
+            storage_class_ok = _s3_usagetype_matches(storage_class, ut)
+        if not storage_class_ok:
+            continue
         if sku not in on_demand:
             continue
         term_entries = on_demand[sku]

@@ -66,3 +66,68 @@ export async function fetchRegions(): Promise<RegionOption[]> {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+// --- Conversation (AI multi-cloud calculator) ---
+
+export type ConversationMode = "expert" | "balanced" | "guided";
+
+export type ConversationRequest = {
+  session_id?: string | null;
+  message: string;
+  mode?: ConversationMode;
+  image?: string | null; // base64
+  image_media_type?: string | null; // e.g. image/png, image/jpeg
+};
+
+export type ConversationResponse = {
+  reply: string;
+  session_id: string;
+  recommendation: unknown;
+};
+
+export async function postConversation(
+  body: ConversationRequest
+): Promise<ConversationResponse> {
+  const res = await fetch(`${API_BASE}/api/conversation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: body.session_id ?? null,
+      message: body.message,
+      mode: body.mode ?? "balanced",
+      image: body.image ?? null,
+      image_media_type: body.image_media_type ?? null,
+    }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export type SessionResponse = {
+  session_id: string;
+  mode: ConversationMode;
+};
+
+export async function postSession(body: {
+  session_id?: string | null;
+  mode?: ConversationMode;
+}): Promise<SessionResponse> {
+  const res = await fetch(`${API_BASE}/api/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: body.session_id ?? null,
+      mode: body.mode ?? "balanced",
+    }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function getSessionInfo(
+  sessionId: string
+): Promise<{ session_id: string; mode: ConversationMode; message_count: number }> {
+  const res = await fetch(`${API_BASE}/api/session/${encodeURIComponent(sessionId)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

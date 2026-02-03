@@ -1,18 +1,19 @@
 # main.py - v1.0
-# FastAPI app: pricing endpoints, calc, health. Deps: pricing_resolver, cost_engine, cache.
-# Port: 8000
+# FastAPI app: pricing, calc, conversation (AI + image upload), session, health.
+# Deps: pricing_resolver, cost_engine, cache, conversation. Port: 8000.
 
 from __future__ import annotations
 
 import os
 import time
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .cache import TTLCache
+from .conversation import chat_turn, create_or_update_session, get_session
 from .cost_engine import (
     TierBand,
     aws_backup_total,
@@ -73,6 +74,65 @@ class CalcInput(BaseModel):
     flat_addon_usd: float = Field(0, ge=0)
 
 
+ConversationModeType = Literal["expert", "balanced", "guided"]
+
+
+class ConversationRequest(BaseModel):
+    session_id: str | None = None
+    message: str = Field("", max_length=64 * 1024)
+    mode: ConversationModeType = "balanced"
+    image: str | None = None  # base64-encoded image for vision
+    image_media_type: str | None = None  # e.g. image/png, image/jpeg
+
+
+class SessionRequest(BaseModel):
+    session_id: str | None = None
+    mode: ConversationModeType = "balanced"
+
+
+# --- Conversation endpoints ---
+
+@app.post("/api/conversation")
+def post_conversation(body: ConversationRequest) -> dict[str, Any]:
+    """
+    Send a user message (and optional image), get AI reply. Creates or resumes session by session_id.
+    If image is provided, Claude interprets it (e.g. architecture drawing) and suggests a solution.
+    """
+    if not (body.message.strip() or body.image):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide at least a message or an image",
+        )
+    session = create_or_update_session(session_id=body.session_id, mode=body.mode)
+    result = chat_turn(
+        session,
+        body.message.strip(),
+        image_base64=body.image,
+        image_media_type=body.image_media_type or (body.image and "image/png"),
+    )
+    return result
+
+
+@app.post("/api/session")
+def post_session(body: SessionRequest) -> dict[str, Any]:
+    """Create or reset a conversation session. Returns session_id and mode."""
+    session = create_or_update_session(session_id=body.session_id, mode=body.mode)
+    return {"session_id": session.session_id, "mode": session.mode}
+
+
+@app.get("/api/session/{session_id}")
+def get_session_info(session_id: str) -> dict[str, Any]:
+    """Get session state (mode, message count). Returns 404 if not found."""
+    session = get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "session_id": session.session_id,
+        "mode": session.mode,
+        "message_count": len(session.messages),
+    }
+
+
 # --- Pricing endpoints (with optional cache bypass) ---
 
 @app.get("/api/pricing/aws-backup")
@@ -88,11 +148,23 @@ def get_aws_backup_pricing(
     if hit is not None:
         data, cached_at = hit
         return {**data, "cached_at": cached_at, "from_cache": True}
-    result = resolve_aws_backup_storage(region_code=region, currency=currency)
+    try:
+        result = resolve_aws_backup_storage(region_code=region, currency=currency)
+    except Exception as e:
+        return {
+            "error": f"Pricing resolution failed: {e}",
+            "rate_per_gb_month": None,
+            "sku": None,
+            "product_attributes": None,
+            "term_code": None,
+            "raw_filter": None,
+        }
     if result.error:
         return {
             "error": result.error,
-            "rate_per_gb_month": None,
+            "rate_per_gb_month": result.rate_per_gb_month,  # may be set (e.g. fallback region)
+            "currency": result.currency,
+            "unit": result.unit,
             "sku": result.sku,
             "product_attributes": result.product_attributes,
             "term_code": result.term_code,
@@ -130,9 +202,19 @@ def get_s3_storage_pricing(
     if hit is not None:
         data, cached_at = hit
         return {**data, "cached_at": cached_at, "from_cache": True}
-    result = resolve_s3_storage(
-        region_code=region, storage_class=storageClass, currency=currency
-    )
+    try:
+        result = resolve_s3_storage(
+            region_code=region, storage_class=storageClass, currency=currency
+        )
+    except Exception as e:
+        return {
+            "error": f"Pricing resolution failed: {e}",
+            "rate_per_gb_month": None,
+            "tiers": [],
+            "sku": None,
+            "product_attributes": None,
+            "raw_filter": None,
+        }
     if result.error:
         return {
             "error": result.error,

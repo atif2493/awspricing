@@ -1,19 +1,22 @@
 # Optional override: frontend runs in dev mode with source mounted so local changes take effect.
-# Usage: docker compose up (compose merges this automatically).
-# Backend already has app mounted + --reload in main compose.
-# Uncomment below to run frontend as Vite dev server (live reload) instead of nginx build.
+# Mount only source/config so the image's node_modules (built for linux in Docker) is used;
+# full ./frontend mount would bring host node_modules and break Rollup native binding in container.
 
-# services:
-#   frontend:
-#     build:
-#       context: ./frontend
-#       dockerfile: Dockerfile.dev
-#     ports:
-#       - "3001:5173"
-#     volumes:
-#       - ./frontend:/app
-#     environment:
-#       - VITE_PROXY_TARGET=http://backend:8000
-#     depends_on:
-#       backend:
-#         condition: service_healthy
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/tsconfig.json:/app/tsconfig.json
+      - ./frontend/tsconfig.node.json:/app/tsconfig.node.json
+    environment:
+      - VITE_PROXY_TARGET=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
