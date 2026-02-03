@@ -1,0 +1,309 @@
+/* awspricing - FinOps-style layout: inputs left, results right. v1.0 */
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.header h1 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.tagline {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 0;
+  flex: 1;
+  max-width: 1600px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inputs-panel {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.inputs-panel-inner section {
+  margin-bottom: 1.5rem;
+}
+
+.inputs-panel-inner h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.inputs-panel-inner label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.inputs-panel-inner label:not(.checkbox):not(.toggle-row) > select,
+.inputs-panel-inner label:not(.checkbox):not(.toggle-row) > input {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+}
+
+.inputs-panel-inner label.inline,
+.inputs-panel-inner .inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.inputs-panel-inner .inline input {
+  flex: 1;
+}
+
+.inputs-panel-inner .toggle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputs-panel-inner .toggle-row span {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.inputs-panel-inner .toggle-row button {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.inputs-panel-inner .toggle-row button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.inputs-panel-inner .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.inputs-panel-inner .checkbox input {
+  width: auto;
+}
+
+.inputs-panel-inner .hint {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.refresh-prices {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--bg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.refresh-prices:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.results {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.banner.error {
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(248, 81, 73, 0.15);
+  border: 1px solid var(--error);
+  border-radius: 4px;
+  color: var(--error);
+  font-size: 0.875rem;
+}
+
+.table-section {
+  margin-bottom: 2rem;
+}
+
+.table-section h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.preset-table,
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.preset-table th,
+.preset-table td,
+.comparison-table th,
+.comparison-table td {
+  padding: 0.6rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.preset-table th,
+.comparison-table th {
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+
+.preset-table tr:last-child td,
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+.transparency-footer {
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.transparency-footer h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.transparency-footer ul {
+  margin: 0 0 1rem 0;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.accordion-trigger {
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.accordion-trigger:hover {
+  background: var(--bg);
+}
+
+.export-actions {
+  margin-top: 1.5rem;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.export-buttons button {
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.export-buttons button:hover {
+  background: var(--border);
+  color: var(--accent);
+}
+
+.advanced-pricing {
+  margin: 1rem 1.5rem 2rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.advanced-pricing h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.advanced-pricing pre {
+  margin: 0 0 1.5rem 0;
+  padding: 0.75rem;
+  background: var(--bg);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.advanced-pricing pre:last-child {
+  margin-bottom: 0;
+}

@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/api/client.ts","./src/components/advancedpricingdetails.tsx","./src/components/comparisontable.tsx","./src/components/inputspanel.tsx","./src/components/presettable.tsx","./src/components/transparencyfooter.tsx","./src/components/index.ts","./src/lib/costengine.ts"],"version":"5.9.3"}

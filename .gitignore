@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Build
+frontend/dist/
+*.egg-info/
+
+# Env (optional; keep .env.example)
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
